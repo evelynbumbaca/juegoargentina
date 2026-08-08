@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Argentina — simulador de futuros posibles</title>
+<style>
+  :root {
+    --fondo: #12161c; --panel: #1a2029; --panel2: #222a35; --borde: #39485c;
+    --texto: #dfe6ef; --suave: #8fa0b5; --acento: #6fb1d8; --oro: #f0d38a;
+    --bien: #7fc98a; --mal: #e0736a; --alerta: #e8b45f;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--fondo); color: var(--texto);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 13px; line-height: 1.45; overflow: hidden;
+  }
+  button {
+    font: inherit; color: var(--texto); background: var(--panel2);
+    border: 2px solid var(--borde); padding: 6px 10px; cursor: pointer;
+    border-radius: 0; transition: none;
+  }
+  button:hover { background: #2d3745; border-color: var(--acento); }
+  button.activo { background: var(--acento); color: #0e1319; border-color: var(--acento); font-weight: 700; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  h1, h2, h3 { margin: 0 0 .4em; font-weight: 700; letter-spacing: .02em; }
+  h1 { font-size: 22px; } h2 { font-size: 15px; } h3 { font-size: 13px; }
+  .suave { color: var(--suave); }
+
+  /* ---------- Pantalla de inicio ---------- */
+  #inicio {
+    position: absolute; inset: 0; overflow-y: auto; padding: 28px 20px;
+    display: flex; justify-content: center;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1c2836 0%, transparent 70%),
+      var(--fondo);
+  }
+  .caja { width: min(1000px, 100%); }
+  .banda { height: 6px; background: linear-gradient(90deg, #6fb1d8 0 33%, #dfe6ef 33% 66%, #6fb1d8 66%); margin-bottom: 18px; }
+  .grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .tarjeta {
+    background: var(--panel); border: 2px solid var(--borde); padding: 10px 12px; cursor: pointer;
+  }
+  .tarjeta:hover, .tarjeta.sel { border-color: var(--oro); background: var(--panel2); }
+  .tarjeta h3 { color: var(--oro); }
+  .campo { margin: 10px 0; }
+  .campo label { display: block; margin-bottom: 3px; }
+  .campo input[type=range] { width: 100%; accent-color: var(--acento); }
+  .campo input[type=text], .campo select {
+    width: 100%; padding: 5px 7px; background: var(--panel2);
+    border: 2px solid var(--borde); color: var(--texto); font: inherit;
+  }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .fila > * { flex: 1 1 220px; }
+
+  /* ---------- Juego ---------- */
+  #juego { display: none; height: 100%; grid-template-columns: 320px 1fr 340px; grid-template-rows: 46px 1fr; }
+  #juego.visible { display: grid; }
+  #barra {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; background: var(--panel); border-bottom: 2px solid var(--borde);
+  }
+  #anio { font-size: 20px; font-weight: 700; color: var(--oro); min-width: 62px; }
+  #era { color: var(--suave); }
+  .panel {
+    background: var(--panel); overflow-y: auto; padding: 10px;
+    border-right: 2px solid var(--borde);
+  }
+  #derecha { border-right: none; border-left: 2px solid var(--borde); }
+  #centro { position: relative; display: flex; flex-direction: column; min-width: 0; }
+  #vistas { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: var(--panel2); border-bottom: 2px solid var(--borde); }
+  #vistas button { padding: 3px 7px; font-size: 11px; }
+  #lienzo { flex: 1; width: 100%; min-height: 0; display: block; image-rendering: pixelated; }
+  #tooltip {
+    position: absolute; pointer-events: none; background: rgba(10,14,20,.95);
+    border: 2px solid var(--acento); padding: 6px 8px; font-size: 11px; display: none; max-width: 260px;
+  }
+
+  .indice { margin-bottom: 8px; }
+  .indice .cab { display: flex; justify-content: space-between; font-size: 11px; }
+  .barra { height: 9px; background: #0e1319; border: 1px solid var(--borde); margin-top: 2px; }
+  .barra i { display: block; height: 100%; background: var(--acento); }
+
+  .grupo { border: 2px solid var(--borde); margin-bottom: 8px; background: #161c24; }
+  .grupo > summary {
+    padding: 5px 8px; cursor: pointer; background: var(--panel2);
+    font-weight: 700; font-size: 12px; list-style: none;
+  }
+  .grupo > summary::-webkit-details-marker { display: none; }
+  .grupo > summary::before { content: '▸ '; color: var(--acento); }
+  .grupo[open] > summary::before { content: '▾ '; }
+  .grupo .cuerpo { padding: 6px 8px; }
+  .dato { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; font-size: 12px; }
+  .dato span:first-child { color: var(--suave); }
+  .dato b { font-weight: 700; }
+  .up { color: var(--bien); } .down { color: var(--mal); }
+
+  #registro { font-size: 12px; }
+  .ent { padding: 3px 0 3px 7px; border-left: 3px solid var(--borde); margin-bottom: 2px; }
+  .ent.evento { border-color: var(--oro); }
+  .ent.decision { border-color: var(--acento); color: var(--acento); }
+  .ent.relato { border-color: #4a5668; color: var(--suave); font-style: italic; }
+  .ent .a { color: var(--suave); margin-right: 5px; }
+
+  /* ---------- Modal de decisión ---------- */
+  #modal {
+    position: absolute; inset: 0; background: rgba(8,11,15,.86); display: none;
+    align-items: center; justify-content: center; padding: 20px; z-index: 20;
+  }
+  #modal.visible { display: flex; }
+  .dialogo {
+    width: min(760px, 100%); max-height: 90%; overflow-y: auto;
+    background: var(--panel); border: 3px solid var(--oro); padding: 16px;
+  }
+  .opcion {
+    display: block; width: 100%; text-align: left; margin-top: 8px; padding: 9px 11px;
+    background: var(--panel2); border: 2px solid var(--borde);
+  }
+  .opcion:hover { border-color: var(--oro); background: #2b3542; }
+  .opcion b { color: var(--oro); display: block; margin-bottom: 2px; }
+  .opcion .r { color: var(--suave); font-size: 12px; }
+  .opcion .ap { font-size: 11px; margin-top: 4px; color: var(--acento); }
+  canvas.spark { width: 100%; height: 46px; display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+
+<div id="inicio">
+  <div class="caja">
+    <div class="banda"></div>
+    <h1>Argentina · simulador de futuros posibles</h1>
+    <p class="suave" style="margin-top:0">
+      Desde 1810. Elegís las condiciones iniciales y el país se desarrolla solo, o intervenís
+      en los momentos en que la historia se bifurca. Cada partida es una Argentina distinta.
+    </p>
+
+    <h2 style="margin-top:18px">1 · Punto de partida</h2>
+    <div class="grilla" id="presets"></div>
+
+    <h2 style="margin-top:18px">2 · Condiciones iniciales</h2>
+    <div class="fila">
+      <div class="campo">
+        <label>Reparto de la tierra</label>
+        <select id="cfg-tierra">
+          <option value="latifundio">Enfiteusis y grandes estancias</option>
+          <option value="mixto">Estancia y chacra conviviendo</option>
+          <option value="colonizacion">Colonización en chacras familiares</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Modelo económico</label>
+        <select id="cfg-modelo">
+          <option value="agroexportador">Agroexportador</option>
+          <option value="mixto">Mixto</option>
+          <option value="proteccionista">Proteccionista</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Alineamiento externo</label>
+        <select id="cfg-alineamiento">
+          <option value="britanico">Órbita británica</option>
+          <option value="autonomo">Tercera posición</option>
+          <option value="americanista">Integración regional</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Frontera con los pueblos originarios</label>
+        <select id="cfg-frontera">
+          <option value="conquista">Campaña militar</option>
+          <option value="tratados">Tratados</option>
+          <option value="integracion">Incorporación negociada</option>
+        </select>
+      </div>
+    </div>
+    <div class="fila">
+      <div class="campo"><label>Apertura comercial · <b id="v-apertura"></b></label>
+        <input type="range" id="cfg-apertura" min="0" max="100" value="75"></div>
+      <div class="campo"><label>Intervención estatal · <b id="v-estado"></b></label>
+        <input type="range" id="cfg-estado" min="0" max="100" value="20"></div>
+      <div class="campo"><label>Federalismo · <b id="v-federalismo"></b></label>
+        <input type="range" id="cfg-federalismo" min="0" max="100" value="40"></div>
+      <div class="campo"><label>Política inmigratoria · <b id="v-inmigracion"></b></label>
+        <input type="range" id="cfg-inmigracion" min="0" max="100" value="60"></div>
+      <div class="campo"><label>Fidelidad histórica · <b id="v-fidelidad"></b></label>
+        <input type="range" id="cfg-fidelidad" min="0" max="100" value="65"></div>
+      <div class="campo"><label>Volatilidad · <b id="v-volatilidad"></b></label>
+        <input type="range" id="cfg-volatilidad" min="20" max="200" value="100"></div>
+    </div>
+    <div class="fila">
+      <div class="campo"><label>Semilla</label><input type="text" id="cfg-semilla"></div>
+      <div class="campo"><label>Año final</label>
+        <select id="cfg-final">
+          <option value="1930">1930</option><option value="1983">1983</option>
+          <option value="2050" selected>2050</option><option value="2100">2100</option>
+        </select></div>
+    </div>
+
+    <h2 style="margin-top:18px">3 · Modo de juego</h2>
+    <div class="grilla">
+      <div class="tarjeta sel" id="modo-observador" data-modo="observador">
+        <h3>Observador</h3>
+        <p class="suave" style="margin:0">Configurás el arranque y mirás. Las decisiones las toma
+        la correlación de fuerzas de cada momento.</p>
+      </div>
+      <div class="tarjeta" id="modo-interventor" data-modo="interventor">
+        <h3>Interventor</h3>
+        <p class="suave" style="margin:0">La simulación se detiene en cada bifurcación y decidís vos.
+        Vas a tener que elegir entre opciones que cuestan.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:18px; display:flex; gap:10px">
+      <button id="empezar" style="border-color:var(--oro); color:var(--oro); font-weight:700; padding:10px 22px">
+        Empezar en 1810
+      </button>
+      <button id="azar">Semilla al azar</button>
+    </div>
+    <p class="suave" style="font-size:11px; margin-top:14px">
+      Los números salen de un modelo, no de una profecía. Sirven para entender mecanismos:
+      de dónde sale la deuda, qué hace el reparto de la tierra, por qué faltan dólares.
+    </p>
+  </div>
+</div>
+
+<div id="juego">
+  <div id="barra">
+    <span id="anio">1810</span>
+    <span id="era" class="suave"></span>
+    <span style="flex:1"></span>
+    <span id="regimen" class="suave"></span>
+    <button id="pausa">▶ Correr</button>
+    <button id="paso1">Un año</button>
+    <button data-vel="1" class="vel activo">1×</button>
+    <button data-vel="4" class="vel">4×</button>
+    <button data-vel="12" class="vel">12×</button>
+    <button id="reiniciar">Nueva partida</button>
+  </div>
+
+  <div class="panel" id="izquierda"></div>
+
+  <div id="centro">
+    <div id="vistas"></div>
+    <canvas id="lienzo"></canvas>
+    <div id="tooltip"></div>
+  </div>
+
+  <div class="panel" id="derecha">
+    <h2>Crónica</h2>
+    <div id="registro"></div>
+  </div>
+
+  <div id="modal"><div class="dialogo" id="dialogo"></div></div>
+</div>
+
+<script type="module" src="./src/ui/app.js"></script>
+</body>
+</html>
