@@ -211,6 +211,10 @@ function nacionInicial(cfg) {
       autonomia: 0.4,
       dependenciaComercial: 0.7, // concentración de socios comerciales
       socioPrincipal: 'britanico',
+      // Expuestos por el sistema `exterior` para que los lean los demás:
+      terminosIntercambio: 0.55,  // contexto mundial de precios (0.5 neutro)
+      giroUtilidades: 0.0,        // divisas que salen como ganancia extranjera
+      cicloHegemonico: 'britanico',
     },
 
     // ---------------- RECURSOS NATURALES ----------------
@@ -229,6 +233,10 @@ function nacionInicial(cfg) {
       controlNacional: 0.9,
       rentaExtractiva: 0.0,
       descubiertos: [],
+      // Expuestos por el sistema `recursos`:
+      potencial: 0.2,       // potencial extractivo agregado del territorio
+      rentaFugada: 0.0,     // parte de la renta que se gira al exterior
+      rentaRetenida: 0.0,
     },
 
     // ---------------- INFRAESTRUCTURA ----------------

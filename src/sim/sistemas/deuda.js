@@ -496,7 +496,16 @@ export default {
     const aumento = interesesCapitalizados + aBrecha + aFiscal + aColocaciones + aEstatizacion;
     let deuda1 = deuda0 + aumento - cancelacion - quita - licuacion;
     deuda1 = clamp(sano(deuda1, deuda0), 0, 5000);
-    d.deudaExterna = deuda1;
+    // Freno a la bola de nieve: por capitalización de intereses el stock no
+    // puede más que duplicarse en pocos años. Superado ese punto la deuda deja
+    // de ser refinanciable en los hechos, y lo que sigue es una crisis (que
+    // disparan los eventos), no un número que sube solo hasta el infinito.
+    // El techo se ata al tamaño de la economía, no a un número absoluto: más
+    // allá de unas seis veces el producto la deuda deja de ser refinanciable en
+    // los hechos y lo que sigue es una reestructuración con quita o un default
+    // (que disparan los eventos), no un stock que sigue creciendo solo.
+    const techo = Math.max(0.02, pbiUsd * 6);
+    d.deudaExterna = Math.min(deuda1, techo);
     d.deudaPbi = clamp(div(deuda1, pbiUsd, 0), 0, 6);
     d.entradaBruta = clamp01(div(entradaBruta, pbiUsd, 0));
     d.brechaDivisas = clamp01(div(faltante, pbiUsd, 0) * 8);

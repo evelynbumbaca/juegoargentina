@@ -73,7 +73,7 @@ export default {
     // -------------------------------------------------------------------
     const envejecimiento = clamp01(1 - d.natalidad / 0.05);
     const mortObjetivo = clamp(
-      0.038
+      0.0345
       - 0.020 * inf.agua_saneamiento
       - 0.014 * inf.salud
       - 0.008 * edu.alfabetizacion
@@ -100,7 +100,7 @@ export default {
     //    secundaria y la autonomía de las mujeres.
     // -------------------------------------------------------------------
     const natObjetivo = clamp(
-      0.050
+      0.0515
       - 0.024 * d.urbanizacion
       - 0.010 * soc.genero
       - 0.008 * edu.secundaria

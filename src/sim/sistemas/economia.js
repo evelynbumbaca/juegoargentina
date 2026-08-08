@@ -32,7 +32,7 @@ const P = {
   fronteraPaso: 1 / 330,     // avance anual de ese nivel
   fronteraPbi1810: 2000,     // PBI pc del país líder en 1810 (int$ de 1990)
   fronteraPbiTasa: 0.0132,   // crecimiento anual del líder
-  gFrontera: 0.0182,         // techo de crecimiento por difusión tecnológica
+  gFrontera: 0.0265,         // techo de crecimiento por difusión tecnológica
 
   // --- Sector externo ---
   kExpAgro: 0.70,            // peso agroganadero en la canasta exportable
@@ -74,7 +74,7 @@ const P = {
   absorcionBase: 0.20,       // capacidad de absorber tecnología del mundo
   kCapital: 0.036,           // aporte de la acumulación de capital
   acumNeutra: 0.42,          // esfuerzo de inversión que sólo repone el desgaste
-  kRestriccion: 0.30,        // caída del producto por racionamiento de importaciones
+  kRestriccion: 0.17,        // caída del producto por racionamiento de importaciones
   kDemanda: 0.28,            // efecto del salario real sobre la demanda
   kToT: 0.16,                // efecto de los términos de intercambio
   sigmaPbi: 0.011,           // ruido anual del producto
@@ -262,8 +262,21 @@ export default {
       P.impSalario * salPrev +
       P.impIndustria * c01(e.industrializacion) * (1 - 0.55 * profundidad) +
       P.impIngreso * clamp01(Math.log10(1 + pbiPrev / 900) / 1.6);
+    // SUSTITUCIÓN FORZADA. Cuando el racionamiento de divisas se sostiene, la
+    // economía aprende a producir localmente lo que no puede importar: es la
+    // fase "stop" del ciclo, y es lo que permite que después venga el "go".
+    // Sin este mecanismo la escasez de dólares no es una fase sino una caída
+    // permanente, porque la propensión a importar nunca baja y el
+    // racionamiento se perpetúa. Se acumula despacio y se revierte despacio:
+    // sustituir importaciones lleva años y se pierde con la apertura.
+    const racionPrev = c01(e._racionamiento, 0);
+    e._sustitucion = clamp01(
+      c01(e._sustitucion, 0) + (racionPrev - 0.22) * 0.10 - 0.03 * pos(apertura - 0.6),
+    );
+
     const impDeseadas = clamp(
       intensidad * (0.45 + 0.75 * apertura) * (1.35 - 0.70 * tcrPrev) *
+      (1 - 0.50 * c01(e._sustitucion)) *
       (1 + P.impCiclo * clamp(crecPrev - gPob, -0.08, 0.08)),
       0.005, 0.70,
     );
@@ -284,13 +297,27 @@ export default {
     const entrada = P.entradaCredito * accesoCredito + P.entradaIed * c01(ext.ied);
     const salida = P.salidaFuga * desconfianza;
     const financiero = entrada - salida;
-    const servicio = clamp(num(deu.servicioDeuda, 0), 0, 4) * expo;
+    // No se puede pagar más de lo que entra: por más que el contrato diga otra
+    // cosa, el servicio efectivo está acotado por la capacidad de pago. Lo que
+    // excede no se paga — se acumula como atraso y lo capitaliza el sistema de
+    // deuda. Sin este tope el servicio se come varias veces las exportaciones,
+    // el país no puede importar ni un insumo y la economía queda encerrada en
+    // una caída de la que ninguna política puede sacarla.
+    const servicioContractual = clamp(num(deu.servicioDeuda, 0), 0, 4) * expo;
+    const servicio = Math.min(servicioContractual, 0.62 * expo);
 
     // Restricción externa dura: no se importa más de lo que se puede pagar.
     const reservasPbi = c01(e.reservas) * P.reservasPbi;
-    const disponible = Math.max(0, expo + financiero - servicio + P.usoReservas * reservasPbi);
+    // Sólo se gastan las reservas que están por encima de un colchón mínimo, y
+    // el uso se apaga a medida que se agotan. Sin este freno el país gasta
+    // todos los años el máximo disponible, las reservas tienden a cero y no
+    // vuelven nunca: la restricción externa deja de ser un ciclo y se
+    // convierte en una caída sin fondo.
+    const usoEfectivo = P.usoReservas * clamp01((c01(e.reservas) - 0.05) / 0.25);
+    const disponible = Math.max(0, expo + financiero - servicio + usoEfectivo * reservasPbi);
     const impEfectivas = Math.min(impDeseadas, disponible);
     const racionamiento = clamp01((impDeseadas - impEfectivas) / Math.max(0.03, impDeseadas));
+    e._racionamiento = racionamiento;
 
     const cuentaCorriente = expo - impEfectivas - servicio;
     const saldoTotal = cuentaCorriente + financiero;
@@ -475,7 +502,18 @@ export default {
 
     const gTec = P.gFrontera * absorcion * (0.75 + 0.85 * brecha);
     const gCapital = P.kCapital * (acumulacion - P.acumNeutra);
-    const gRestriccion = -P.kRestriccion * Math.pow(racionamiento, 1.15);
+    // RESTRICCIÓN EXTERNA. Falta de divisas golpea el NIVEL del producto, no su
+    // tasa de crecimiento para siempre: una economía cerrada a la fuerza es más
+    // pobre, pero no se achica quince por ciento todos los años durante un
+    // siglo. Por eso el costo grande se computa sobre el CAMBIO del
+    // racionamiento —el shock, la fase "stop"— y queda sólo un costo de nivel
+    // pequeño mientras dura. Cuando el racionamiento cede, el mismo término se
+    // vuelve positivo: esa es la fase "go". El ciclo sale de acá.
+    const gRestriccion = clamp(
+      -P.kRestriccion * (racionamiento - racionPrev) * 3.2
+      - 0.022 * racionamiento * racionamiento,
+      -0.15, 0.10,
+    );
     const gPrecios = -0.06 * suave(e.inflacion, 0.35, 4) - 0.03 * suave(e.inflacion, 1.5, 8);
     // La inestabilidad frena la inversión y desorganiza la producción, pero no
     // destruye producto un año tras otro sin fondo: se acota para que no genere

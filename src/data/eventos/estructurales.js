@@ -558,9 +558,9 @@ export default [
           api.modificador({
             id: 'shock_precios', etiqueta: 'Precios internacionales deprimidos', años: 3 + rng.entero(0, 3),
             efectos: {
-              'nacion.economia.terminosIntercambio': -0.05,
-              'nacion.economia.balanzaComercial': -0.03,
-              'nacion.economia.reservas': -0.02,
+              'nacion.economia.terminosIntercambio': -0.015,
+              'nacion.economia.balanzaComercial': -0.010,
+              'nacion.economia.reservas': -0.006,
             },
           });
           s.presiones.externa = Math.min(1, s.presiones.externa + 0.25);
@@ -575,9 +575,9 @@ export default [
           api.modificador({
             id: 'auge_precios', etiqueta: 'Términos de intercambio favorables', años: 3 + rng.entero(0, 4),
             efectos: {
-              'nacion.economia.terminosIntercambio': 0.05,
-              'nacion.economia.balanzaComercial': 0.03,
-              'nacion.economia.reservas': 0.02,
+              'nacion.economia.terminosIntercambio': 0.015,
+              'nacion.economia.balanzaComercial': 0.010,
+              'nacion.economia.reservas': 0.006,
             },
           });
         },
@@ -700,9 +700,9 @@ export default [
           api.modificador({
             id: 'sequia', etiqueta: 'Sequía', años: 1 + rng.entero(0, 2),
             efectos: {
-              'nacion.recursos.agro': -0.06 * dureza,
-              'nacion.economia.balanzaComercial': -0.06 * dureza,
-              'nacion.economia.reservas': -0.04 * dureza,
+              'nacion.recursos.agro': -0.022 * dureza,
+              'nacion.economia.balanzaComercial': -0.020 * dureza,
+              'nacion.economia.reservas': -0.012 * dureza,
             },
           });
           s.presiones.externa = Math.min(1, s.presiones.externa + 0.2 * dureza);
