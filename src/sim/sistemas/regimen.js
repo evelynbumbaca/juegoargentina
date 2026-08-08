@@ -42,10 +42,14 @@ export default {
       [promedio(estado.provincias.map((p) => [p.integracion, 1])), 0.15],
     ]));
     // Una guerra civil o una crisis institucional desarma el aparato estatal.
-    const desarme = (estado.flags.guerra_civil ? 0.12 : 0)
-      + (r.tipo === 'anarquia' ? 0.10 : 0)
-      + estado.presiones.regional * 0.03;
-    r.capacidadEstatal = clamp01(hacia(r.capacidadEstatal, objetivoCapacidad, 0.06) - desarme);
+    // Es una pérdida PROPORCIONAL a lo que hay: se desarma una fracción del
+    // Estado existente, no una cantidad fija que lo llevaría siempre a cero.
+    const desarme = clamp01((estado.flags.guerra_civil ? 0.20 : 0)
+      + (r.tipo === 'anarquia' ? 0.15 : 0)
+      + estado.presiones.regional * 0.10);
+    r.capacidadEstatal = clamp01(
+      hacia(r.capacidadEstatal, objetivoCapacidad, 0.06) * (1 - desarme * 0.25)
+    );
 
     // ------------------------------------------------------------------
     // Legitimidad: no es popularidad, es la creencia de que las reglas valen.
@@ -62,16 +66,17 @@ export default {
     const castigoRepresion = n.social.represion * 0.15;
     const premioDerechos = (n.social.derechosCiviles * 0.5 + n.social.derechosPoliticos * 0.5) * 0.2;
 
+    // El desgaste del ejercicio del poder es real, pero tiene techo: ningún
+    // gobierno pierde legitimidad indefinidamente por el mero paso del tiempo.
+    const desgaste = Math.min(0.30, 0.012 * Math.max(0, r.añosEnPoder - 8));
+
     const objetivoLegitimidad = clamp01(
-      0.25 + bienestarPercibido * 0.45 + premioDerechos
+      0.28 + bienestarPercibido * 0.45 + premioDerechos
       - frustracion * 0.4 - castigoInflacion - castigoRepresion
-      - r.corrupcion * 0.15
+      - r.corrupcion * 0.15 - desgaste
       + (eco.crecimiento > 0 ? Math.min(0.12, eco.crecimiento * 2.5) : Math.max(-0.2, eco.crecimiento * 2.5))
     );
     r.legitimidad = clamp01(hacia(r.legitimidad, objetivoLegitimidad, 0.22));
-
-    // El desgaste del ejercicio del poder es real y acumulativo.
-    if (r.añosEnPoder > 6) r.legitimidad = clamp01(r.legitimidad - 0.006 * (r.añosEnPoder - 6));
 
     // ------------------------------------------------------------------
     // Democracia: converge al tipo de régimen, pero la consolidación
@@ -111,7 +116,7 @@ export default {
       + estado.presiones.regional * 0.2 + estado.presiones.deuda * 0.2
     );
     r.estabilidad = clamp01(hacia(r.estabilidad,
-      clamp01(r.legitimidad * 0.55 + r.capacidadEstatal * 0.25 + 0.2 - amenazas * 0.8), 0.2));
+      clamp01(r.legitimidad * 0.50 + r.capacidadEstatal * 0.22 + 0.30 - amenazas * 0.85), 0.2));
 
     // ------------------------------------------------------------------
     // Provincias: desarrollo, integración al Estado nacional y autonomismo
@@ -154,7 +159,7 @@ export default {
     const desarrollos = estado.provincias.map((p) => p.desarrollo);
     const brecha = Math.max(...desarrollos) - Math.min(...desarrollos);
     estado.presiones.regional = clamp01(
-      estado.presiones.regional + autonomismoMedio * 0.35 + brecha * 0.25 - r.capacidadEstatal * 0.15
+      estado.presiones.regional + autonomismoMedio * 0.16 + brecha * 0.14 - r.capacidadEstatal * 0.12
     );
 
     // ------------------------------------------------------------------

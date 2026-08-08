@@ -280,7 +280,7 @@ export default {
     // El mercado internacional de crédito no está siempre abierto: hace falta
     // un Estado reconocido que pueda firmar (o haber firmado ya alguna vez).
     const mercadoAbierto = !!flags.emprestito_baring
-      || deuda0 > 0.002
+      || deuda0 > 0.02
       || (sano(estado.regimen.capacidadEstatal, 0.15) > 0.3 && !!flags.constitucion_sancionada);
 
     // =====================================================================
@@ -414,7 +414,12 @@ export default {
     // =====================================================================
     // 6. OFERTA DE FINANCIAMIENTO Y RACIONAMIENTO
     // =====================================================================
-    const ofertaMax = pbiUsd * (0.02 + 0.17 * d.accesoCredito * (0.35 + 0.65 * ciclo));
+    // Sin mercado abierto no hay oferta de ningún tipo: a un Estado que nadie
+    // reconoce no se le presta ni al 100% de interés. El piso del 2% sólo
+    // existe una vez que el país ya entró al mercado internacional.
+    const ofertaMax = mercadoAbierto
+      ? pbiUsd * (0.02 + 0.17 * d.accesoCredito * (0.35 + 0.65 * ciclo))
+      : 0;
     const demandaIntereses = Math.max(0, intereses - recursosGenuinos);
     const demandaTotal = demandaIntereses + brechaDivisas + deficitExterno + empuje + estatizacion;
     const financiado = Math.min(demandaTotal, Math.max(0, ofertaMax));

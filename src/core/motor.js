@@ -27,11 +27,16 @@ export const ERAS = [
 ];
 
 /**
- * Cuánto sobrevive cada presión de un año al siguiente. Con 0.6, un conflicto
- * sin nuevas causas se descomprime en unos cinco años; con causas sostenidas,
- * el acumulado se estabiliza alto y termina disparando eventos.
+ * Cuánto sobrevive cada presión de un año al siguiente.
+ *
+ * Importa más de lo que parece: como los sistemas SUMAN su aporte cada año, el
+ * nivel de equilibrio de una presión es aporte/(1-decaimiento). Con 0.35, una
+ * causa sostenida se estabiliza en torno a 1,5 veces el aporte anual, de modo
+ * que el fondo de la simulación queda en tensión baja y los umbrales de crisis
+ * (0,55-0,6) sólo se alcanzan cuando algo se agravó de verdad. Con valores
+ * altos, en cambio, el país vive en crisis permanente desde 1810.
  */
-export const DECAIMIENTO_PRESION = 0.6;
+export const DECAIMIENTO_PRESION = 0.35;
 
 export function eraDe(año) {
   for (let i = ERAS.length - 1; i >= 0; i--) if (año >= ERAS[i].desde) return ERAS[i];
@@ -62,6 +67,15 @@ const SIN_LIMITE = new Set([
   'nacion.economia.deficitFiscal', 'nacion.deuda.deudaExterna',
   'nacion.deuda.deudaPbi', 'nacion.deuda.tasaInteres',
   'nacion.deuda.servicioDeuda',
+]);
+
+/**
+ * Objetos anidados que sí son estado normalizable 0..1 (proporciones que deben
+ * sumar uno o repartos). Todo lo demás que sea objeto se deja intacto.
+ */
+const ANIDADOS_NORMALIZABLES = new Set([
+  'demografia.composicion',
+  'deuda.acreedores',
 ]);
 
 export function aplicarDelta(estado, ruta, delta) {
@@ -359,17 +373,29 @@ export class Motor {
     return true;
   }
 
-  /** Barrera anti-NaN y anti-valores absurdos: la simulación nunca explota. */
+  /**
+   * Barrera anti-NaN y anti-valores absurdos: la simulación nunca explota.
+   *
+   * Sólo normaliza los campos de estado propiamente dichos. NO toca:
+   *   - las claves con prefijo `_`, que son memoria interna de cada sistema
+   *     (medias móviles, valores del año anterior, contadores);
+   *   - los objetos anidados que no estén en ANIDADOS_NORMALIZABLES, porque
+   *     son diagnósticos o estructuras auxiliares donde un número negativo o
+   *     mayor que uno es perfectamente legítimo.
+   * Recortar esas cosas a 0..1 corrompe silenciosamente los sistemas: es el
+   * tipo de error que no rompe nada y arruina todo.
+   */
   sanear() {
     const s = this.estado;
     const recorrer = (obj, ruta) => {
       for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith('_')) continue;
         const r = ruta ? `${ruta}.${k}` : k;
         if (typeof v === 'number') {
           if (!Number.isFinite(v)) obj[k] = 0;
           else if (!SIN_LIMITE.has(`nacion.${r}`)) obj[k] = clamp01(v);
         } else if (v && typeof v === 'object' && !Array.isArray(v)) {
-          recorrer(v, r);
+          if (ANIDADOS_NORMALIZABLES.has(r)) recorrer(v, r);
         }
       }
     };

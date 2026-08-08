@@ -477,8 +477,19 @@ export default {
     const gCapital = P.kCapital * (acumulacion - P.acumNeutra);
     const gRestriccion = -P.kRestriccion * Math.pow(racionamiento, 1.15);
     const gPrecios = -0.06 * suave(e.inflacion, 0.35, 4) - 0.03 * suave(e.inflacion, 1.5, 8);
-    const gPolitico = 0.05 * (c01(reg.estabilidad, 0.5) - 0.45) +
-      0.03 * (c01(reg.legitimidad, 0.5) - 0.5) - 0.05 * c01(pres.social);
+    // La inestabilidad frena la inversión y desorganiza la producción, pero no
+    // destruye producto un año tras otro sin fondo: se acota para que no genere
+    // una espiral irreversible. Un país puede estar mal gobernado durante
+    // décadas sin desaparecer.
+    // Sólo penaliza el EXCESO sobre la tensión de fondo que cualquier país
+    // tiene siempre: en tiempos normales el término es casi cero, y muerde de
+    // verdad cuando hay crisis institucional o conflicto social abierto.
+    const gPolitico = clamp(
+      0.050 * (c01(reg.estabilidad, 0.5) - 0.35) +
+      0.030 * (c01(reg.legitimidad, 0.5) - 0.40) -
+      0.050 * pos(c01(pres.social) - 0.35),
+      -0.030, 0.020,
+    );
     const gDemanda = P.kDemanda * clamp(deltaSalario, -0.3, 0.3);
     const gToT = P.kToT * (tot - 0.5) * 0.4;
     const ruido = azar.normal(P.sigmaPbi * vol);
@@ -490,6 +501,15 @@ export default {
 
     e.pbiPerCapita = clamp(pbiPrev * (1 + gPerCapita), 250, 250000);
     e.crecimiento = clamp(gPerCapita + gPob, -0.32, 0.24);
+
+    // Descomposición del crecimiento: qué empuja y qué frena. La usa la
+    // interfaz para explicar por qué la economía hace lo que hace.
+    e.diagnostico = {
+      tecnologia: gTec, capital: gCapital, restriccionExterna: gRestriccion,
+      precios: gPrecios, politica: gPolitico, demanda: gDemanda,
+      terminosIntercambio: gToT, acumulacion, absorcion, racionamiento,
+      ruido, gPob, perCapita: gPerCapita,
+    };
 
     // =====================================================================
     // J. Empleo, informalidad y desigualdad
