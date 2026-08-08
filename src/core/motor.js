@@ -26,6 +26,13 @@ export const ERAS = [
   { id: 'futuro', desde: 2035, hasta: 2200, nombre: 'Futuro abierto' },
 ];
 
+/**
+ * Cuánto sobrevive cada presión de un año al siguiente. Con 0.6, un conflicto
+ * sin nuevas causas se descomprime en unos cinco años; con causas sostenidas,
+ * el acumulado se estabiliza alto y termina disparando eventos.
+ */
+export const DECAIMIENTO_PRESION = 0.6;
+
 export function eraDe(año) {
   for (let i = ERAS.length - 1; i >= 0; i--) if (año >= ERAS[i].desde) return ERAS[i];
   return ERAS[0];
@@ -157,7 +164,10 @@ export class Motor {
     const año = s.año;
     const out = [];
     for (const ev of this.eventos) {
-      if (ev.unaVez !== false && s.eventosDisparados[ev.id]) continue;
+      const ultimo = s.eventosDisparados[ev.id];
+      if (ev.unaVez !== false && ultimo) continue;
+      // Los eventos recurrentes necesitan dejar pasar su enfriamiento.
+      if (ev.unaVez === false && ultimo && año - ultimo < (ev.enfriamiento ?? 5)) continue;
       const [a, b] = ev.ventana ?? [ev.año ?? -Infinity, ev.año ?? Infinity];
       if (año < a || año > b) continue;
       if (typeof ev.requiere === 'function') {
@@ -258,6 +268,10 @@ export class Motor {
 
     // 1. Efectos temporales heredados
     this.procesarModificadores();
+
+    // 1b. Las presiones decaen ANTES de que los sistemas aporten las del año,
+    // para que los eventos (que corren después) lean el acumulado fresco.
+    for (const k of Object.keys(s.presiones)) s.presiones[k] *= DECAIMIENTO_PRESION;
 
     // 2. Sistemas
     const ctx = this.contexto();
