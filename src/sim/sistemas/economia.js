@@ -32,7 +32,7 @@ const P = {
   fronteraPaso: 1 / 330,     // avance anual de ese nivel
   fronteraPbi1810: 2000,     // PBI pc del país líder en 1810 (int$ de 1990)
   fronteraPbiTasa: 0.0132,   // crecimiento anual del líder
-  gFrontera: 0.0265,         // techo de crecimiento por difusión tecnológica
+  gFrontera: 0.0215,         // techo de crecimiento por difusión tecnológica
 
   // --- Sector externo ---
   kExpAgro: 0.70,            // peso agroganadero en la canasta exportable
@@ -73,7 +73,7 @@ const P = {
   // --- Crecimiento ---
   absorcionBase: 0.20,       // capacidad de absorber tecnología del mundo
   kCapital: 0.036,           // aporte de la acumulación de capital
-  acumNeutra: 0.42,          // esfuerzo de inversión que sólo repone el desgaste
+  acumNeutra: 0.33,          // esfuerzo de inversión que sólo repone el desgaste
   kRestriccion: 0.17,        // caída del producto por racionamiento de importaciones
   kDemanda: 0.28,            // efecto del salario real sobre la demanda
   kToT: 0.16,                // efecto de los términos de intercambio
@@ -304,7 +304,7 @@ export default {
     // el país no puede importar ni un insumo y la economía queda encerrada en
     // una caída de la que ninguna política puede sacarla.
     const servicioContractual = clamp(num(deu.servicioDeuda, 0), 0, 4) * expo;
-    const servicio = Math.min(servicioContractual, 0.62 * expo);
+    const servicio = Math.min(servicioContractual, 0.45 * expo);
 
     // Restricción externa dura: no se importa más de lo que se puede pagar.
     const reservasPbi = c01(e.reservas) * P.reservasPbi;
@@ -315,7 +315,13 @@ export default {
     // convierte en una caída sin fondo.
     const usoEfectivo = P.usoReservas * clamp01((c01(e.reservas) - 0.05) / 0.25);
     const disponible = Math.max(0, expo + financiero - servicio + usoEfectivo * reservasPbi);
-    const impEfectivas = Math.min(impDeseadas, disponible);
+    // AHORRO PRECAUTORIO. Con las reservas en el piso no se gasta hasta el
+    // último dólar disponible: se guarda algo para reconstruir el colchón. Es
+    // lo que permite salir del régimen de escasez permanente, en el que sin
+    // reservas nunca se puede amortizar deuda y sin amortizar nunca alcanzan
+    // las reservas.
+    const ahorroPrecautorio = 0.14 * clamp01((0.30 - c01(e.reservas)) / 0.30);
+    const impEfectivas = Math.min(impDeseadas, disponible * (1 - ahorroPrecautorio));
     const racionamiento = clamp01((impDeseadas - impEfectivas) / Math.max(0.03, impDeseadas));
     e._racionamiento = racionamiento;
 
@@ -509,10 +515,14 @@ export default {
     // racionamiento —el shock, la fase "stop"— y queda sólo un costo de nivel
     // pequeño mientras dura. Cuando el racionamiento cede, el mismo término se
     // vuelve positivo: esa es la fase "go". El ciclo sale de acá.
+    // El tope tiene que ser SIMÉTRICO: si la caída puede ser mayor que la
+    // recuperación, cada ciclo de escasez y holgura deja al país un poco más
+    // pobre aunque el racionamiento vuelva al punto de partida, y doscientos
+    // años de ciclos aplastan la economía sin que ninguna decisión lo explique.
     const gRestriccion = clamp(
-      -P.kRestriccion * (racionamiento - racionPrev) * 3.2
+      -P.kRestriccion * (racionamiento - racionPrev) * 2.2
       - 0.022 * racionamiento * racionamiento,
-      -0.15, 0.10,
+      -0.13, 0.13,
     );
     const gPrecios = -0.06 * suave(e.inflacion, 0.35, 4) - 0.03 * suave(e.inflacion, 1.5, 8);
     // La inestabilidad frena la inversión y desorganiza la producción, pero no
@@ -522,11 +532,14 @@ export default {
     // Sólo penaliza el EXCESO sobre la tensión de fondo que cualquier país
     // tiene siempre: en tiempos normales el término es casi cero, y muerde de
     // verdad cuando hay crisis institucional o conflicto social abierto.
+    // Asimétrico a propósito: gobernar bien no agrega crecimiento año tras año,
+    // pero gobernar mal sí lo resta. Un país estable crece por acumulación y
+    // técnica, no por su estabilidad en sí.
     const gPolitico = clamp(
-      0.050 * (c01(reg.estabilidad, 0.5) - 0.35) +
-      0.030 * (c01(reg.legitimidad, 0.5) - 0.40) -
-      0.050 * pos(c01(pres.social) - 0.35),
-      -0.030, 0.020,
+      0.050 * (c01(reg.estabilidad, 0.5) - 0.40) +
+      0.030 * (c01(reg.legitimidad, 0.5) - 0.48) -
+      0.050 * pos(c01(pres.social) - 0.36),
+      -0.030, 0.010,
     );
     const gDemanda = P.kDemanda * clamp(deltaSalario, -0.3, 0.3);
     const gToT = P.kToT * (tot - 0.5) * 0.4;

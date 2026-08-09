@@ -385,7 +385,7 @@ export default {
       - 0.15 * bool(flags.bicameral_deuda)
       - 0.10 * clamp01(sano(ext.autonomia, 0.4))
     );
-    const empuje = pbiUsd * 0.065 * Math.pow(ciclo, 1.8) * apetito
+    const empuje = pbiUsd * 0.030 * Math.pow(ciclo, 1.8) * apetito
       * (1 - clamp01(sano(d.riesgoPais, 0.4))) * d.accesoCredito;
 
     // (d) ESTATIZACIÓN DE DEUDA PRIVADA.
@@ -451,6 +451,20 @@ export default {
     );
     const cancelacion = sobrante * voluntadCancelar;
 
+    // AMORTIZACIÓN ESTRUCTURAL. La cancelación de arriba exige haber pagado
+    // antes todos los intereses, y con el stock alto eso no pasa nunca: el
+    // resultado es una deuda que sólo puede subir. En la realidad un país con
+    // saldo comercial positivo y reservas repaga capital en vez de renovarlo
+    // todo, aunque su cuenta fiscal no cierre. Sin esta pieza el
+    // desendeudamiento es imposible y la deuda deja de ser una variable del
+    // juego para volverse una condena.
+    const amortizacion = defaultActivo ? 0 : deuda0 * clamp01(
+      0.055 * clamp01(balanza * 3)
+      + 0.045 * clamp01((reservas - 0.15) / 0.40)
+      + 0.035 * bool(flags.desendeudamiento)
+      + 0.020 * clamp01(sano(ext.soberania, 0.5) - 0.5)
+    );
+
     // Licuación de la parte emitida en moneda propia: se erosiona con inflación.
     // Es la contracara del riesgo de la deuda en moneda dura.
     const monLocal = 1 - clamp01(sano(d.monedaExtranjera, 0.9));
@@ -494,7 +508,7 @@ export default {
     // =====================================================================
     const entradaBruta = aIntereses + aBrecha + aFiscal + aColocaciones + aEstatizacion;
     const aumento = interesesCapitalizados + aBrecha + aFiscal + aColocaciones + aEstatizacion;
-    let deuda1 = deuda0 + aumento - cancelacion - quita - licuacion;
+    let deuda1 = deuda0 + aumento - cancelacion - amortizacion - quita - licuacion;
     deuda1 = clamp(sano(deuda1, deuda0), 0, 5000);
     // Freno a la bola de nieve: por capitalización de intereses el stock no
     // puede más que duplicarse en pocos años. Superado ese punto la deuda deja
@@ -504,9 +518,27 @@ export default {
     // allá de unas seis veces el producto la deuda deja de ser refinanciable en
     // los hechos y lo que sigue es una reestructuración con quita o un default
     // (que disparan los eventos), no un stock que sigue creciendo solo.
-    const techo = Math.max(0.02, pbiUsd * 6);
-    d.deudaExterna = Math.min(deuda1, techo);
-    d.deudaPbi = clamp(div(deuda1, pbiUsd, 0), 0, 6);
+    // TECHO SOSTENIBLE Y REESTRUCTURACIÓN AUTOMÁTICA.
+    // Ningún acreedor sostiene indefinidamente un stock que no se puede pagar:
+    // lo que excede el techo se termina reconociendo como incobrable en un
+    // arreglo con quita (1890, los años 30, el Club de París, el Plan Brady,
+    // los canjes de 2005 y 2010). Sin esta válvula los intereses impagos se
+    // capitalizan para siempre y el país queda encerrado en un servicio de
+    // deuda que se come varias veces sus exportaciones, todos los años, dos
+    // siglos seguidos.
+    const techo = Math.max(0.02, pbiUsd * 0.95);
+    if (deuda1 > techo) {
+      const quitado = deuda1 - techo;
+      d.ultimaQuita = { año, monto: quitado };
+      d.deudaExterna = techo;
+      // Reestructurar tiene precio: el mercado no lo olvida rápido.
+      d.riesgoPais = clamp01(d.riesgoPais + 0.08);
+      d.accesoCredito = clamp01(d.accesoCredito - 0.10);
+    } else {
+      d.deudaExterna = deuda1;
+    }
+    d.deudaPbi = clamp(div(d.deudaExterna, pbiUsd, 0), 0, 6);
+    // (se recalcula más abajo, después de aplicar el techo de sostenibilidad)
     d.entradaBruta = clamp01(div(entradaBruta, pbiUsd, 0));
     d.brechaDivisas = clamp01(div(faltante, pbiUsd, 0) * 8);
 

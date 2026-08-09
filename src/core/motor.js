@@ -411,7 +411,7 @@ export class Motor {
     n.deuda.deudaExterna = clamp(sano(n.deuda.deudaExterna, 0), 0, 5000);
     n.deuda.deudaPbi = clamp(sano(n.deuda.deudaPbi, 0), 0, 6);
     n.deuda.tasaInteres = clamp(sano(n.deuda.tasaInteres, 0.05), 0, 0.9);
-    n.deuda.servicioDeuda = clamp(sano(n.deuda.servicioDeuda, 0), 0, 5);
+    n.deuda.servicioDeuda = clamp(sano(n.deuda.servicioDeuda, 0), 0, 0.85);
 
     for (const a of Object.keys(s.actores)) s.actores[a] = clamp01(sano(s.actores[a], 0));
     for (const p of Object.keys(s.presiones)) s.presiones[p] = clamp01(sano(s.presiones[p], 0));

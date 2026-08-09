@@ -132,13 +132,13 @@ export default {
       + 0.14 * (1 - soc.conflictividad)
       - 0.20 * soc.represion
     );
-    const entradaEuropea = olaEuropea(ctx.año) * atractivo * 0.30;
+    const entradaEuropea = olaEuropea(ctx.año) * atractivo * 0.46;
 
     // Migración limítrofe y regional: pesa cuando Argentina está relativamente
     // mejor que sus vecinos, y no depende de ninguna ola transatlántica.
     const ventajaRegional = clamp01(ingreso * 0.6 + eco.salarioReal * 0.4 - 0.25);
     const entradaLimitrofe = ctx.año > 1900
-      ? ventajaRegional * 0.075 * clamp01(0.4 + ctx.config.inmigracion)
+      ? ventajaRegional * 0.115 * clamp01(0.4 + ctx.config.inmigracion)
       : 0;
 
     // Emigración: se van cuando se rompe el horizonte, no sólo cuando hay
